@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Clock, DoorOpen, Edit, Trash2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -48,18 +50,22 @@ const ToiletCard = ({ toilet, onEdit, onDelete }: ToiletCardProps) => {
     }
   }, [toilet.is_occupied, toilet.occupied_since]);
 
-  const handleManualOpen = async () => {
+  const handleDoorToggle = async (isOpen: boolean) => {
     try {
+      const updates = isOpen
+        ? { is_occupied: false, occupied_since: null, is_paid: false, status: "available" as const }
+        : { is_occupied: true, occupied_since: new Date().toISOString(), status: "occupied" as const };
+
       const { error } = await supabase
         .from("toilets")
-        .update({ is_occupied: false, occupied_since: null, is_paid: false })
+        .update(updates)
         .eq("id", toilet.id);
 
       if (error) throw error;
 
       toast({
-        title: "Door Opened",
-        description: `${toilet.name} has been manually opened.`,
+        title: isOpen ? "Door Opened" : "Door Closed",
+        description: `${toilet.name} door ${isOpen ? "opened" : "closed"} successfully.`,
       });
     } catch (error: any) {
       toast({
@@ -113,18 +119,23 @@ const ToiletCard = ({ toilet, onEdit, onDelete }: ToiletCardProps) => {
           </div>
         )}
 
+        {toilet.manual_open_enabled && toilet.status !== "maintenance" && (
+          <div className="flex items-center justify-between p-3 rounded-lg border bg-card/50">
+            <div className="flex items-center gap-2">
+              <DoorOpen className="w-4 h-4 text-muted-foreground" />
+              <Label htmlFor={`door-toggle-${toilet.id}`} className="text-sm font-medium cursor-pointer">
+                Door Control
+              </Label>
+            </div>
+            <Switch
+              id={`door-toggle-${toilet.id}`}
+              checked={!toilet.is_occupied}
+              onCheckedChange={handleDoorToggle}
+            />
+          </div>
+        )}
+
         <div className="flex gap-2 pt-2">
-          {toilet.manual_open_enabled && toilet.is_occupied && (
-            <Button
-              onClick={handleManualOpen}
-              variant="outline"
-              size="sm"
-              className="flex-1"
-            >
-              <DoorOpen className="w-4 h-4 mr-2" />
-              Manual Open
-            </Button>
-          )}
           <Button
             onClick={() => onEdit(toilet)}
             variant="outline"
