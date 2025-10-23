@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import ToiletCard from "@/components/ToiletCard";
 import ToiletDialog from "@/components/ToiletDialog";
 import PaymentDialog from "@/components/PaymentDialog";
+import PaymentMessages from "@/components/PaymentMessages";
+import AccessLogs from "@/components/AccessLogs";
 
 interface Toilet {
   id: string;
@@ -166,23 +168,30 @@ const Index = () => {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {toilets.map((toilet) => (
-              <div key={toilet.id} className="relative">
-                <ToiletCard toilet={toilet} onEdit={handleEdit} onDelete={handleDelete} />
-                {!toilet.is_paid && toilet.is_occupied && (
-                  <Button
-                    onClick={() => handlePayment(toilet)}
-                    className="absolute -top-2 -right-2 shadow-elevated"
-                    size="sm"
-                    variant="default"
-                  >
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Verify Payment
-                  </Button>
-                )}
-              </div>
-            ))}
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {toilets.map((toilet) => (
+                <div key={toilet.id} className="relative">
+                  <ToiletCard toilet={toilet} onEdit={handleEdit} onDelete={handleDelete} />
+                  {!toilet.is_paid && toilet.is_occupied && (
+                    <Button
+                      onClick={() => handlePayment(toilet)}
+                      className="absolute -top-2 -right-2 shadow-elevated"
+                      size="sm"
+                      variant="default"
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Verify Payment
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <PaymentMessages />
+              <AccessLogs />
+            </div>
           </div>
         )}
       </main>
