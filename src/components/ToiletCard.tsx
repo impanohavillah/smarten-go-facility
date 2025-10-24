@@ -5,21 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Clock, DoorOpen, Edit, Trash2, AlertTriangle } from "lucide-react";
-import { database } from "@/lib/firebase";
-import { ref, update } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
-
-interface Toilet {
-  id: string;
-  name: string;
-  location: string | null;
-  status: "available" | "occupied" | "maintenance";
-  is_occupied: boolean;
-  occupied_since: string | null;
-  is_paid: boolean;
-  last_payment_time: string | null;
-  manual_open_enabled: boolean;
-}
+import { Toilet, updateToilet } from "@/services/toiletService";
 
 interface ToiletCardProps {
   toilet: Toilet;
@@ -54,11 +41,10 @@ const ToiletCard = ({ toilet, onEdit, onDelete }: ToiletCardProps) => {
   const handleDoorToggle = async (isOpen: boolean) => {
     try {
       const updates = isOpen
-        ? { is_occupied: false, occupied_since: null, is_paid: false, status: "available" }
-        : { is_occupied: true, occupied_since: new Date().toISOString(), status: "occupied" };
+        ? { is_occupied: false, occupied_since: null, is_paid: false, status: "available" as const }
+        : { is_occupied: true, occupied_since: new Date().toISOString(), status: "occupied" as const };
 
-      const toiletRef = ref(database, `toilets/${toilet.id}`);
-      await update(toiletRef, updates);
+      await updateToilet(toilet.id, updates);
 
       toast({
         title: isOpen ? "Door Opened" : "Door Closed",

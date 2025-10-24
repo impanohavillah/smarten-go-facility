@@ -1,65 +1,20 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { database } from "@/lib/firebase";
-import { ref, onValue, query, orderByChild, limitToLast } from "firebase/database";
 import { Activity, Clock, AlertTriangle } from "lucide-react";
-
-interface AccessLog {
-  id: string;
-  entry_time: string;
-  exit_time: string | null;
-  duration_minutes: number | null;
-  security_alert: boolean;
-  alert_reason: string | null;
-  toilet_id: string;
-  toilet_name?: string;
-}
+import { AccessLog, subscribeToRecentAccessLogs } from "@/services/accessLogService";
 
 const AccessLogs = () => {
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchLogs();
-  }, []);
-
-  const fetchLogs = async () => {
-    try {
-      const logsRef = ref(database, 'access_logs');
-      const logsQuery = query(logsRef, orderByChild('entry_time'), limitToLast(10));
-      
-      onValue(logsQuery, async (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const logsArray = await Promise.all(
-            Object.keys(data).map(async (key) => {
-              const log = { id: key, ...data[key] };
-              
-              // Fetch toilet name
-              if (log.toilet_id) {
-                const toiletRef = ref(database, `toilets/${log.toilet_id}`);
-                const toiletSnapshot = await new Promise((resolve) => {
-                  onValue(toiletRef, (snap) => resolve(snap), { onlyOnce: true });
-                });
-                const toiletData = (toiletSnapshot as any).val();
-                log.toilet_name = toiletData?.name || "Unknown Toilet";
-              }
-              
-              return log;
-            })
-          );
-          setLogs(logsArray.reverse());
-        } else {
-          setLogs([]);
-        }
-        setLoading(false);
-      });
-    } catch (error) {
-      console.error("Error fetching logs:", error);
+    const unsubscribe = subscribeToRecentAccessLogs((logsArray) => {
+      setLogs(logsArray);
       setLoading(false);
-    }
-  };
+    });
+    return () => unsubscribe();
+  }, []);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

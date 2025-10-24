@@ -11,21 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { database } from "@/lib/firebase";
-import { ref, set, update, push } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
-
-interface Toilet {
-  id: string;
-  name: string;
-  location: string | null;
-  status: "available" | "occupied" | "maintenance";
-  is_occupied: boolean;
-  occupied_since: string | null;
-  is_paid: boolean;
-  last_payment_time: string | null;
-  manual_open_enabled: boolean;
-}
+import { Toilet, createToilet, updateToilet } from "@/services/toiletService";
 
 interface ToiletDialogProps {
   open: boolean;
@@ -68,25 +55,19 @@ const ToiletDialog = ({ open, onOpenChange, toilet, onSuccess }: ToiletDialogPro
 
     try {
       if (toilet) {
-        const toiletRef = ref(database, `toilets/${toilet.id}`);
-        await update(toiletRef, formData);
-
+        await updateToilet(toilet.id, formData);
         toast({
           title: "Success",
           description: "Toilet updated successfully.",
         });
       } else {
-        const toiletsRef = ref(database, 'toilets');
-        const newToiletRef = push(toiletsRef);
-        await set(newToiletRef, {
+        await createToilet({
           ...formData,
           is_occupied: false,
           occupied_since: null,
           is_paid: false,
           last_payment_time: null,
-          created_at: new Date().toISOString()
         });
-
         toast({
           title: "Success",
           description: "Toilet created successfully.",

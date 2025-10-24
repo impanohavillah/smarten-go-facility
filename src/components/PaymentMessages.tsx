@@ -1,65 +1,20 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { database } from "@/lib/firebase";
-import { ref, onValue, query, orderByChild, limitToLast } from "firebase/database";
 import { CreditCard, Clock, CheckCircle2 } from "lucide-react";
-
-interface Payment {
-  id: string;
-  amount: number;
-  payment_method: "momo" | "rfid_card";
-  payment_reference: string;
-  status: "pending" | "completed" | "failed";
-  created_at: string;
-  toilet_id: string;
-  toilet_name?: string;
-}
+import { Payment, subscribeToRecentPayments } from "@/services/paymentService";
 
 const PaymentMessages = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPayments();
-  }, []);
-
-  const fetchPayments = async () => {
-    try {
-      const paymentsRef = ref(database, 'payments');
-      const paymentsQuery = query(paymentsRef, orderByChild('created_at'), limitToLast(10));
-      
-      onValue(paymentsQuery, async (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const paymentsArray = await Promise.all(
-            Object.keys(data).map(async (key) => {
-              const payment = { id: key, ...data[key] };
-              
-              // Fetch toilet name
-              if (payment.toilet_id) {
-                const toiletRef = ref(database, `toilets/${payment.toilet_id}`);
-                const toiletSnapshot = await new Promise((resolve) => {
-                  onValue(toiletRef, (snap) => resolve(snap), { onlyOnce: true });
-                });
-                const toiletData = (toiletSnapshot as any).val();
-                payment.toilet_name = toiletData?.name || "Unknown Toilet";
-              }
-              
-              return payment;
-            })
-          );
-          setPayments(paymentsArray.reverse());
-        } else {
-          setPayments([]);
-        }
-        setLoading(false);
-      });
-    } catch (error) {
-      console.error("Error fetching payments:", error);
+    const unsubscribe = subscribeToRecentPayments((paymentsArray) => {
+      setPayments(paymentsArray);
       setLoading(false);
-    }
-  };
+    });
+    return () => unsubscribe();
+  }, []);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

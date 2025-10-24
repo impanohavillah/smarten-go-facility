@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { database } from "@/lib/firebase";
-import { ref, onValue, remove } from "firebase/database";
 import { Button } from "@/components/ui/button";
 import { Plus, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -10,18 +8,7 @@ import ToiletCard from "@/components/ToiletCard";
 import ToiletDialog from "@/components/ToiletDialog";
 import PaymentMessages from "@/components/PaymentMessages";
 import AccessLogs from "@/components/AccessLogs";
-
-interface Toilet {
-  id: string;
-  name: string;
-  location: string | null;
-  status: "available" | "occupied" | "maintenance";
-  is_occupied: boolean;
-  occupied_since: string | null;
-  is_paid: boolean;
-  last_payment_time: string | null;
-  manual_open_enabled: boolean;
-}
+import { Toilet, subscribeToToilets, deleteToilet } from "@/services/toiletService";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -33,8 +20,11 @@ const Index = () => {
 
   useEffect(() => {
     checkAuth();
-    fetchToilets();
-    setupRealtimeSubscription();
+    const unsubscribe = subscribeToToilets((toiletsArray) => {
+      setToilets(toiletsArray);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   const checkAuth = async () => {
@@ -42,37 +32,6 @@ const Index = () => {
     if (!session) {
       navigate("/auth");
     }
-  };
-
-  const fetchToilets = () => {
-    try {
-      const toiletsRef = ref(database, 'toilets');
-      onValue(toiletsRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const toiletsArray = Object.keys(data).map(key => ({
-            id: key,
-            ...data[key]
-          }));
-          setToilets(toiletsArray);
-        } else {
-          setToilets([]);
-        }
-        setLoading(false);
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      setLoading(false);
-    }
-  };
-
-  const setupRealtimeSubscription = () => {
-    // Firebase onValue already provides real-time updates
-    // No additional setup needed
   };
 
   const handleSignOut = async () => {
@@ -87,9 +46,7 @@ const Index = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const toiletRef = ref(database, `toilets/${id}`);
-      await remove(toiletRef);
-
+      await deleteToilet(id);
       toast({
         title: "Success",
         description: "Toilet deleted successfully.",
@@ -174,7 +131,7 @@ const Index = () => {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         toilet={selectedToilet}
-        onSuccess={fetchToilets}
+        onSuccess={() => {}}
       />
     </div>
   );
