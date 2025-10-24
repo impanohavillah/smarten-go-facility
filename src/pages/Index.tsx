@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { database } from "@/lib/firebase";
+import { ref, onValue, remove } from "firebase/database";
 import { Button } from "@/components/ui/button";
 import { Plus, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -42,41 +44,35 @@ const Index = () => {
     }
   };
 
-  const fetchToilets = async () => {
+  const fetchToilets = () => {
     try {
-      const { data, error } = await supabase
-        .from("toilets")
-        .select("*")
-        .order("created_at", { ascending: true });
-
-      if (error) throw error;
-      setToilets(data || []);
+      const toiletsRef = ref(database, 'toilets');
+      onValue(toiletsRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const toiletsArray = Object.keys(data).map(key => ({
+            id: key,
+            ...data[key]
+          }));
+          setToilets(toiletsArray);
+        } else {
+          setToilets([]);
+        }
+        setLoading(false);
+      });
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
 
   const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel("toilets-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "toilets" },
-        () => {
-          fetchToilets();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Firebase onValue already provides real-time updates
+    // No additional setup needed
   };
 
   const handleSignOut = async () => {
@@ -91,15 +87,13 @@ const Index = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from("toilets").delete().eq("id", id);
-
-      if (error) throw error;
+      const toiletRef = ref(database, `toilets/${id}`);
+      await remove(toiletRef);
 
       toast({
         title: "Success",
         description: "Toilet deleted successfully.",
       });
-      fetchToilets();
     } catch (error: any) {
       toast({
         title: "Error",

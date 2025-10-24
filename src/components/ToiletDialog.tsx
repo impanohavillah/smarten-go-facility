@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { supabase } from "@/integrations/supabase/client";
+import { database } from "@/lib/firebase";
+import { ref, set, update, push } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
 
 interface Toilet {
@@ -67,21 +68,24 @@ const ToiletDialog = ({ open, onOpenChange, toilet, onSuccess }: ToiletDialogPro
 
     try {
       if (toilet) {
-        const { error } = await supabase
-          .from("toilets")
-          .update(formData)
-          .eq("id", toilet.id);
-
-        if (error) throw error;
+        const toiletRef = ref(database, `toilets/${toilet.id}`);
+        await update(toiletRef, formData);
 
         toast({
           title: "Success",
           description: "Toilet updated successfully.",
         });
       } else {
-        const { error } = await supabase.from("toilets").insert([formData]);
-
-        if (error) throw error;
+        const toiletsRef = ref(database, 'toilets');
+        const newToiletRef = push(toiletsRef);
+        await set(newToiletRef, {
+          ...formData,
+          is_occupied: false,
+          occupied_since: null,
+          is_paid: false,
+          last_payment_time: null,
+          created_at: new Date().toISOString()
+        });
 
         toast({
           title: "Success",

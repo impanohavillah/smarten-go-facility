@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { database } from "@/lib/firebase";
+import { ref, onValue, query, orderByChild, limitToLast } from "firebase/database";
 import { CreditCard, Clock, CheckCircle2 } from "lucide-react";
 
 interface Payment {
@@ -11,9 +12,8 @@ interface Payment {
   payment_reference: string;
   status: "pending" | "completed" | "failed";
   created_at: string;
-  toilets: {
-    name: string;
-  } | null;
+  toilet_id: string;
+  toilet_name?: string;
 }
 
 const PaymentMessages = () => {
@@ -22,46 +22,43 @@ const PaymentMessages = () => {
 
   useEffect(() => {
     fetchPayments();
-    setupRealtimeSubscription();
   }, []);
 
   const fetchPayments = async () => {
     try {
-      const { data, error } = await supabase
-        .from("payments")
-        .select(`
-          *,
-          toilets (
-            name
-          )
-        `)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      setPayments(data || []);
+      const paymentsRef = ref(database, 'payments');
+      const paymentsQuery = query(paymentsRef, orderByChild('created_at'), limitToLast(10));
+      
+      onValue(paymentsQuery, async (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const paymentsArray = await Promise.all(
+            Object.keys(data).map(async (key) => {
+              const payment = { id: key, ...data[key] };
+              
+              // Fetch toilet name
+              if (payment.toilet_id) {
+                const toiletRef = ref(database, `toilets/${payment.toilet_id}`);
+                const toiletSnapshot = await new Promise((resolve) => {
+                  onValue(toiletRef, (snap) => resolve(snap), { onlyOnce: true });
+                });
+                const toiletData = (toiletSnapshot as any).val();
+                payment.toilet_name = toiletData?.name || "Unknown Toilet";
+              }
+              
+              return payment;
+            })
+          );
+          setPayments(paymentsArray.reverse());
+        } else {
+          setPayments([]);
+        }
+        setLoading(false);
+      });
     } catch (error) {
       console.error("Error fetching payments:", error);
-    } finally {
       setLoading(false);
     }
-  };
-
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel("payments-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "payments" },
-        () => {
-          fetchPayments();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   };
 
   const formatDate = (dateString: string) => {
@@ -138,7 +135,7 @@ const PaymentMessages = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-medium text-sm">
-                        {payment.toilets?.name || "Unknown Toilet"}
+                        {payment.toilet_name || "Unknown Toilet"}
                       </p>
                       {getStatusBadge(payment.status)}
                     </div>

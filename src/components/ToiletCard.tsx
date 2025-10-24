@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Clock, DoorOpen, Edit, Trash2, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { database } from "@/lib/firebase";
+import { ref, update } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
 
 interface Toilet {
@@ -53,15 +54,11 @@ const ToiletCard = ({ toilet, onEdit, onDelete }: ToiletCardProps) => {
   const handleDoorToggle = async (isOpen: boolean) => {
     try {
       const updates = isOpen
-        ? { is_occupied: false, occupied_since: null, is_paid: false, status: "available" as const }
-        : { is_occupied: true, occupied_since: new Date().toISOString(), status: "occupied" as const };
+        ? { is_occupied: false, occupied_since: null, is_paid: false, status: "available" }
+        : { is_occupied: true, occupied_since: new Date().toISOString(), status: "occupied" };
 
-      const { error } = await supabase
-        .from("toilets")
-        .update(updates)
-        .eq("id", toilet.id);
-
-      if (error) throw error;
+      const toiletRef = ref(database, `toilets/${toilet.id}`);
+      await update(toiletRef, updates);
 
       toast({
         title: isOpen ? "Door Opened" : "Door Closed",

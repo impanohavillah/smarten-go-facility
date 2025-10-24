@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { database } from "@/lib/firebase";
+import { ref, onValue, query, orderByChild, limitToLast } from "firebase/database";
 import { Activity, Clock, AlertTriangle } from "lucide-react";
 
 interface AccessLog {
@@ -11,9 +12,8 @@ interface AccessLog {
   duration_minutes: number | null;
   security_alert: boolean;
   alert_reason: string | null;
-  toilets: {
-    name: string;
-  } | null;
+  toilet_id: string;
+  toilet_name?: string;
 }
 
 const AccessLogs = () => {
@@ -22,46 +22,43 @@ const AccessLogs = () => {
 
   useEffect(() => {
     fetchLogs();
-    setupRealtimeSubscription();
   }, []);
 
   const fetchLogs = async () => {
     try {
-      const { data, error } = await supabase
-        .from("access_logs")
-        .select(`
-          *,
-          toilets (
-            name
-          )
-        `)
-        .order("entry_time", { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      setLogs(data || []);
+      const logsRef = ref(database, 'access_logs');
+      const logsQuery = query(logsRef, orderByChild('entry_time'), limitToLast(10));
+      
+      onValue(logsQuery, async (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const logsArray = await Promise.all(
+            Object.keys(data).map(async (key) => {
+              const log = { id: key, ...data[key] };
+              
+              // Fetch toilet name
+              if (log.toilet_id) {
+                const toiletRef = ref(database, `toilets/${log.toilet_id}`);
+                const toiletSnapshot = await new Promise((resolve) => {
+                  onValue(toiletRef, (snap) => resolve(snap), { onlyOnce: true });
+                });
+                const toiletData = (toiletSnapshot as any).val();
+                log.toilet_name = toiletData?.name || "Unknown Toilet";
+              }
+              
+              return log;
+            })
+          );
+          setLogs(logsArray.reverse());
+        } else {
+          setLogs([]);
+        }
+        setLoading(false);
+      });
     } catch (error) {
       console.error("Error fetching logs:", error);
-    } finally {
       setLoading(false);
     }
-  };
-
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel("access-logs-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "access_logs" },
-        () => {
-          fetchLogs();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   };
 
   const formatDate = (dateString: string) => {
@@ -120,7 +117,7 @@ const AccessLogs = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="font-medium text-sm">
-                      {log.toilets?.name || "Unknown Toilet"}
+                      {log.toilet_name || "Unknown Toilet"}
                     </p>
                     {log.security_alert && (
                       <Badge className="bg-destructive text-white">Alert</Badge>

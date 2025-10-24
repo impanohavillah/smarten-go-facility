@@ -1,9 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const FIREBASE_URL = 'https://smartengo-f6a29-default-rtdb.firebaseio.com';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -11,10 +11,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     const { toilet_id, sensor_status } = await req.json();
 
     if (!toilet_id || !sensor_status) {
@@ -39,14 +35,17 @@ Deno.serve(async (req) => {
           status: 'available' 
         };
 
-    const { data, error } = await supabase
-      .from('toilets')
-      .update(updates)
-      .eq('id', toilet_id)
-      .select()
-      .single();
+    const response = await fetch(`${FIREBASE_URL}/toilets/${toilet_id}.json`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
 
-    if (error) throw error;
+    if (!response.ok) {
+      throw new Error(`Firebase update failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
 
     return new Response(
       JSON.stringify({ success: true, data }),
