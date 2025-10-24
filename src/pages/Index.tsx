@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Plus, LogOut, CreditCard } from "lucide-react";
+import { Plus, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ToiletCard from "@/components/ToiletCard";
 import ToiletDialog from "@/components/ToiletDialog";
-import PaymentDialog from "@/components/PaymentDialog";
 import PaymentMessages from "@/components/PaymentMessages";
 import AccessLogs from "@/components/AccessLogs";
 
@@ -28,9 +27,7 @@ const Index = () => {
   const [toilets, setToilets] = useState<Toilet[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedToilet, setSelectedToilet] = useState<Toilet | null>(null);
-  const [paymentToilet, setPaymentToilet] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -117,10 +114,6 @@ const Index = () => {
     setDialogOpen(true);
   };
 
-  const handlePayment = (toilet: Toilet) => {
-    setPaymentToilet({ id: toilet.id, name: toilet.name });
-    setPaymentDialogOpen(true);
-  };
 
   if (loading) {
     return (
@@ -171,20 +164,7 @@ const Index = () => {
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {toilets.map((toilet) => (
-                <div key={toilet.id} className="relative">
-                  <ToiletCard toilet={toilet} onEdit={handleEdit} onDelete={handleDelete} />
-                  {!toilet.is_paid && toilet.is_occupied && (
-                    <Button
-                      onClick={() => handlePayment(toilet)}
-                      className="absolute -top-2 -right-2 shadow-elevated"
-                      size="sm"
-                      variant="default"
-                    >
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Verify Payment
-                    </Button>
-                  )}
-                </div>
+                <ToiletCard key={toilet.id} toilet={toilet} onEdit={handleEdit} onDelete={handleDelete} />
               ))}
             </div>
 
@@ -202,15 +182,6 @@ const Index = () => {
         toilet={selectedToilet}
         onSuccess={fetchToilets}
       />
-
-      {paymentToilet && (
-        <PaymentDialog
-          open={paymentDialogOpen}
-          onOpenChange={setPaymentDialogOpen}
-          toiletId={paymentToilet.id}
-          toiletName={paymentToilet.name}
-        />
-      )}
     </div>
   );
 };
